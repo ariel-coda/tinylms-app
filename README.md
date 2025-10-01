@@ -1,1 +1,1 @@
-# TinyLMS
+# tinylms app
