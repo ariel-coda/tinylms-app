@@ -1,55 +1,3 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>README - Projet Next.js</title>
-  <style>
-    body {
-      font-family: "Inter", sans-serif;
-      background-color: #fafafa;
-      color: #111;
-      line-height: 1.7;
-      padding: 2rem 3rem;
-      max-width: 900px;
-      margin: auto;
-    }
-    h1, h2, h3 {
-      color: #0a0a0a;
-    }
-    h1 {
-      font-size: 2.5rem;
-      margin-bottom: 1rem;
-    }
-    h2 {
-      font-size: 1.6rem;
-      margin-top: 2.5rem;
-      border-left: 5px solid #00bfa6;
-      padding-left: 10px;
-    }
-    p, li {
-      font-size: 1rem;
-    }
-    ul {
-      padding-left: 1.2rem;
-    }
-    a {
-      color: #00bfa6;
-      text-decoration: none;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-    .highlight {
-      background: #e0f7f4;
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      font-weight: 500;
-    }
-  </style>
-</head>
-<body>
-
   <h1>🚀 Projet Next.js avec Supabase</h1>
 
   <h2>📖 Introduction</h2>
@@ -90,4 +38,48 @@
 
   <h2>📘 Commandes disponibles</h2>
   <ul>
-    <
+    <li><span class="highlight">npm run dev</span> → Lancer le serveur de développement</li>
+    <li><span class="highlight">npm run build</span> → Compiler le projet pour la production</li>
+    <li><span class="highlight">npm run start</span> → Démarrer le serveur en mode production</li>
+    <li><span class="highlight">npm run lint</span> → Vérifier la qualité du code</li>
+  </ul>
+
+  <h2>🚀 Déploiement</h2>
+  <p>
+    Le déploiement recommandé se fait sur <a href="https://vercel.com/new" target="_blank">Vercel</a> (service officiel Next.js).  
+    Vous pouvez aussi utiliser :
+  </p>
+  <ul>
+    <li><strong>Netlify</strong> – support des fonctions serverless</li>
+    <li><strong>Railway</strong> – déploiement rapide via Docker</li>
+    <li><strong>Render</strong> – PaaS avec certificat SSL automatique</li>
+  </ul>
+
+  <h2>🔐 Intégration Supabase</h2>
+  <p>
+    Supabase est utilisé pour :
+  </p>
+  <ul>
+    <li>La création et la gestion des utilisateurs via <span class="highlight">supabase.auth.signUp()</span></li>
+    <li>La gestion des abonnements ou des données via <span class="highlight">supabase.from().insert()</span></li>
+  </ul>
+  <p>
+    Assurez-vous que votre projet Supabase contient les tables nécessaires, 
+    comme <span class="highlight">users</span> et <span class="highlight">subscriptions</span>.
+  </p>
+
+  <h2>💡 Bonnes pratiques</h2>
+  <ul>
+    <li>Ne jamais exposer la clé <strong>SUPABASE_SERVICE_ROLE_KEY</strong> dans le frontend.</li>
+    <li>Utilisez toujours des routes API (<strong>/app/api/</strong>) pour les opérations sensibles.</li>
+    <li>Stockez les clés uniquement dans le fichier <strong>.env.local</strong>.</li>
+  </ul>
+
+  <h2>📚 Crédits</h2>
+  <p>
+    Documentation générée avec ❤️ pour accompagner le développement du projet TinyLMS.  
+    © 2025 — Ariel & TinyLMS.
+  </p>
+
+</body>
+</html>
