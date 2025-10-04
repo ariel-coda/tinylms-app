@@ -1,223 +1,353 @@
 "use client";
-import React, { useState } from "react";
-import { Bird, BookOpen, Users, Laptop, GraduationCap } from "lucide-react";
 
-export default function TinyLMSSignup() {
+import { useState } from "react";
+import { Bird, Mail, Lock, Phone, User, Building2, Shield } from "lucide-react";
+import { useRouter } from "next/navigation";
+
+export default function SignupPage() {
+  const router = useRouter();
+  const [step, setStep] = useState(1);
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
   const [formData, setFormData] = useState({
     fullName: "",
     phone: "",
-    instituteName: "",
-    email: "",
+    schoolName: "",
+    schoolEmail: "",
+    role: "",
     password: "",
-    agreedToTerms: false,
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+  const regex = {
+    fullName: /^[a-zA-ZÀ-ÿ]+(?: [a-zA-ZÀ-ÿ]+)+$/,
+    phone: /^6[5679][0-9]{7}$/,
+    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+    password: /^.{6,}$/,
   };
 
-  const handleSubmit = () => {
-    console.log("Form submitted:", formData);
+  const validateStep1 = () => {
+    let newErrors: { [key: string]: string } = {};
+
+    if (!regex.fullName.test(formData.fullName))
+      newErrors.fullName = "Nom complet invalide (au moins 2 mots).";
+    if (!regex.phone.test(formData.phone))
+      newErrors.phone =
+        "Numéro invalide (format Cameroun: 65/66/67/69xxxxxxx).";
+    if (!formData.schoolName.trim())
+      newErrors.schoolName = "Le nom de l'établissement est obligatoire.";
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateStep2 = () => {
+    let newErrors: { [key: string]: string } = {};
+
+    if (!regex.email.test(formData.schoolEmail))
+      newErrors.schoolEmail = "Email invalide.";
+    if (!formData.role.trim()) newErrors.role = "Veuillez choisir un rôle.";
+    if (!regex.password.test(formData.password))
+      newErrors.password = "Mot de passe : min. 6 caractères.";
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleNext = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validateStep1()) {
+      setStep(2);
+      setErrors({});
+    }
+  };
+
+  const handleBack = () => {
+    setStep(1);
+    setErrors({});
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateStep2()) return;
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      console.log("📤 Envoi des données:", formData);
+
+      const res = await fetch("/api/inscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+      console.log("📥 Réponse API:", data);
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur d'inscription");
+      }
+
+      setMessage("✅ " + data.message);
+      setTimeout(() => router.push("/login"), 2000);
+    } catch (err: any) {
+      console.error("💥 Erreur:", err);
+      setMessage("❌ " + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left Side - Form */}
-      <div className="w-full lg:w-1/2 bg-white flex items-center justify-center p-8 lg:p-16">
-        <div className="w-full max-w-md">
-          {/* Logo */}
-          <div className="mb-12">
-            <Bird className="w-10 h-10 text-blue-500" strokeWidth={1.5} />
+    <div className="min-h-screen flex items-center justify-center bg-white px-4">
+      <div className="w-full max-w-md bg-white rounded-2xl p-8">
+        {/* Logo & Title */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="flex items-center space-x-2 mb-4">
+            <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900 mb-4">
+              <Bird size={38} className="text-emerald-400" />
+            </div>
+            <h1 className="hidden">TinyLMS</h1>
           </div>
+          <h2 className="text-2xl font-bold text-slate-800">
+            {step === 1 ? "Créer un compte" : "Finaliser l'inscription"}
+          </h2>
+          <p className="text-slate-500 text-center mt-3 text-sm">
+            {step === 1
+              ? "Rejoignez TinyLMS et simplifiez la gestion de vos formations."
+              : "Complétez vos informations de connexion."}
+          </p>
+        </div>
 
-          {/* Title */}
-          <h1 className="text-4xl font-bold text-gray-900 mb-8">
-            Commencez avec tinyLMS
-          </h1>
-
-          {/* Form Fields */}
+        {/* Step 1 Form */}
+        {step === 1 && (
           <div className="space-y-5">
-            {/* Full Name */}
             <div>
               <label
                 htmlFor="fullName"
-                className="block text-sm font-medium text-gray-700 mb-1.5"
+                className="block text-sm font-medium text-slate-700 mb-2"
               >
-                Full name
+                Nom complet
               </label>
-              <input
-                type="text"
-                id="fullName"
-                name="fullName"
-                value={formData.fullName}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                placeholder="John Doe"
-              />
+              <div className="relative">
+                <User
+                  size={18}
+                  className="absolute left-3 top-3 text-slate-400"
+                />
+                <input
+                  id="fullName"
+                  name="fullName"
+                  type="text"
+                  value={formData.fullName}
+                  onChange={handleChange}
+                  placeholder="BANAKEN Ariel"
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+              {errors.fullName && (
+                <p className="text-red-500 text-sm mt-1">{errors.fullName}</p>
+              )}
             </div>
 
-            {/* Institute Phone Number */}
             <div>
               <label
                 htmlFor="phone"
-                className="block text-sm font-medium text-gray-700 mb-1.5"
+                className="block text-sm font-medium text-slate-700 mb-2"
               >
-                Institute phone number
+                Numéro de téléphone
               </label>
-              <input
-                type="tel"
-                id="phone"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                placeholder="+1 (555) 000-0000"
-              />
+              <div className="relative">
+                <Phone
+                  size={18}
+                  className="absolute left-3 top-3 text-slate-400"
+                />
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="6XXXXXXXX"
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+              {errors.phone && (
+                <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
+              )}
             </div>
 
-            {/* Institute Name */}
             <div>
               <label
-                htmlFor="instituteName"
-                className="block text-sm font-medium text-gray-700 mb-1.5"
+                htmlFor="schoolName"
+                className="block text-sm font-medium text-slate-700 mb-2"
               >
-                Institute name
+                Nom de l'établissement
               </label>
-              <input
-                type="text"
-                id="instituteName"
-                name="instituteName"
-                value={formData.instituteName}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                placeholder="Your Institute"
-              />
+              <div className="relative">
+                <Building2
+                  size={18}
+                  className="absolute left-3 top-3 text-slate-400"
+                />
+                <input
+                  id="schoolName"
+                  name="schoolName"
+                  type="text"
+                  value={formData.schoolName}
+                  onChange={handleChange}
+                  placeholder="Centre de formation XYZ"
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+              {errors.schoolName && (
+                <p className="text-red-500 text-sm mt-1">{errors.schoolName}</p>
+              )}
             </div>
 
-            {/* Institute Email */}
+            <button
+              onClick={handleNext}
+              className="w-full py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors"
+            >
+              Continuer
+            </button>
+          </div>
+        )}
+
+        {/* Step 2 Form */}
+        {step === 2 && (
+          <div className="space-y-5">
             <div>
               <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700 mb-1.5"
+                htmlFor="schoolEmail"
+                className="block text-sm font-medium text-slate-700 mb-2"
               >
-                Institute email address
+                Email de l'établissement
               </label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                placeholder="admin@institute.edu"
-              />
+              <div className="relative">
+                <Mail
+                  size={18}
+                  className="absolute left-3 top-3 text-slate-400"
+                />
+                <input
+                  id="schoolEmail"
+                  name="schoolEmail"
+                  type="email"
+                  value={formData.schoolEmail}
+                  onChange={handleChange}
+                  placeholder="contact@etablissement.com"
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+              {errors.schoolEmail && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.schoolEmail}
+                </p>
+              )}
             </div>
 
-            {/* Password */}
+            <div>
+              <label
+                htmlFor="role"
+                className="block text-sm font-medium text-slate-700 mb-2"
+              >
+                Rôle
+              </label>
+              <div className="relative">
+                <Shield
+                  size={18}
+                  className="absolute left-3 top-3 text-slate-400"
+                />
+                <select
+                  id="role"
+                  name="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                >
+                  <option value="">Sélectionnez un rôle</option>
+                  <option value="administrateur">Directeur du centre</option>
+                  <option value="responsable">Responsable pédagogique</option>
+                  <option value="enseignant">Enseignant</option>
+                </select>
+              </div>
+              {errors.role && (
+                <p className="text-red-500 text-sm mt-1">{errors.role}</p>
+              )}
+            </div>
+
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-1.5"
+                className="block text-sm font-medium text-slate-700 mb-2"
               >
-                Password
+                Mot de passe
               </label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                placeholder="min 8 chars"
-              />
+              <div className="relative">
+                <Lock
+                  size={18}
+                  className="absolute left-3 top-3 text-slate-400"
+                />
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+              {errors.password && (
+                <p className="text-red-500 text-sm mt-1">{errors.password}</p>
+              )}
             </div>
 
-            {/* Terms Checkbox */}
-            <div className="flex items-start">
-              <input
-                type="checkbox"
-                id="agreedToTerms"
-                name="agreedToTerms"
-                checked={formData.agreedToTerms}
-                onChange={handleChange}
-                className="mt-1 w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <label
-                htmlFor="agreedToTerms"
-                className="ml-2 text-sm text-gray-600"
+            <div className="space-y-3">
+              <button
+                onClick={handleSubmit}
+                className="w-full py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors"
               >
-                I agree to the{" "}
-                <span className="text-blue-500 hover:underline cursor-pointer">
-                  Terms of Service
-                </span>{" "}
-                and{" "}
-                <span className="text-blue-500 hover:underline cursor-pointer">
-                  Privacy Policy
-                </span>
-              </label>
-            </div>
-
-            {/* Register Button */}
-            <button
-              onClick={handleSubmit}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg transition duration-200"
-            >
-              Register
-            </button>
-          </div>
-
-          {/* Sign In Link */}
-          <p className="mt-6 text-center text-sm text-gray-600">
-            Already have an account?{" "}
-            <span className="text-blue-500 hover:underline font-medium cursor-pointer">
-              Sign in
-            </span>
-          </p>
-        </div>
-      </div>
-
-      {/* Right Side - Illustration */}
-      <div className="hidden lg:flex lg:w-1/2 bg-blue-500 items-center justify-center p-16 relative overflow-hidden">
-        <div className="relative w-full max-w-lg">
-          {/* Decorative circles */}
-          <div className="absolute top-10 right-10 w-32 h-32 bg-blue-400 rounded-full opacity-30"></div>
-          <div className="absolute bottom-20 left-10 w-24 h-24 bg-blue-600 rounded-full opacity-20"></div>
-
-          {/* Main illustration elements */}
-          <div className="relative z-10 flex flex-col items-center space-y-12">
-            {/* Top row - Books and Laptop */}
-            <div className="flex items-center justify-center space-x-16">
-              <div className="bg-white bg-opacity-20 backdrop-blur-sm p-8 rounded-2xl transform -rotate-6">
-                <BookOpen className="w-16 h-16 text-white" strokeWidth={1.5} />
-              </div>
-              <div className="bg-white bg-opacity-20 backdrop-blur-sm p-8 rounded-2xl transform rotate-6">
-                <Laptop className="w-16 h-16 text-white" strokeWidth={1.5} />
-              </div>
-            </div>
-
-            {/* Center - Main graduation cap */}
-            <div className="bg-white bg-opacity-25 backdrop-blur-md p-12 rounded-3xl shadow-2xl">
-              <GraduationCap
-                className="w-24 h-24 text-white"
-                strokeWidth={1.5}
-              />
-            </div>
-
-            {/* Bottom - Users icon */}
-            <div className="bg-white bg-opacity-20 backdrop-blur-sm p-8 rounded-2xl">
-              <Users className="w-16 h-16 text-white" strokeWidth={1.5} />
+                S'inscrire
+              </button>
+              <button
+                onClick={handleBack}
+                className="w-full py-3 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors"
+              >
+                Retour
+              </button>
             </div>
           </div>
+        )}
 
-          {/* Additional decorative elements */}
-          <div className="absolute top-1/4 left-1/4 w-3 h-3 bg-white rounded-full opacity-60"></div>
-          <div className="absolute top-1/3 right-1/4 w-2 h-2 bg-white rounded-full opacity-40"></div>
-          <div className="absolute bottom-1/4 left-1/3 w-4 h-4 bg-white rounded-full opacity-50"></div>
+        {/* Footer */}
+        <div className="mt-6 text-center text-sm text-slate-500">
+          En vous inscrivant à TinyLMS, vous acceptez nos{" "}
+          <a href="#" className="text-emerald-600 hover:underline font-medium">
+            conditions d'utilisation
+          </a>
+          .
         </div>
+        <p className="text-center mt-5 text-sm text-slate-500">
+          Vous avez déjà un compte ?{" "}
+          <button
+            className="underline text-emerald-600"
+            onClick={() => {
+              router.push("./login");
+            }}
+          >
+            Connectez vous ici
+          </button>
+        </p>
       </div>
     </div>
   );
