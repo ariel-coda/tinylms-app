@@ -1,354 +1,273 @@
 "use client";
-
-import { useState } from "react";
-import { Bird, Mail, Lock, Phone, User, Building2, Shield } from "lucide-react";
+import React from "react";
+import { Formik, Form, Field, ErrorMessage } from "formik";
 import { useRouter } from "next/navigation";
+import * as Yup from "yup";
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+  sendEmailVerification,
+} from "firebase/auth";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "./lib/firebase";
+import Header from "./components/ui/header";
 
-export default function SignupPage() {
+// Regex personnalisées
+const nomCompletRegex = /^[a-zA-ZÀ-ÿ]+([\s'-][a-zA-ZÀ-ÿ]+)+$/;
+const telephoneRegex = /^\+237[26]\d{8}$/;
+const nomStructureRegex = /^[a-zA-Z0-9À-ÿ]+([\s'-][a-zA-Z0-9À-ÿ]+)*$/;
+const roleRegex = /^[a-zA-ZÀ-ÿ]+([\s'-][a-zA-ZÀ-ÿ]+)*$/;
+const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+const motDePasseSecuriseRegex =
+  /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#_])[A-Za-z\d@$!%*?&#_]{8,}/;
+
+// Validation Yup
+const validationSchema = Yup.object({
+  nomComplet: Yup.string()
+    .matches(nomCompletRegex, "Nom complet invalide.")
+    .required("Le nom complet est obligatoire."),
+  telephone: Yup.string()
+    .matches(telephoneRegex, "Numéro de téléphone invalide.")
+    .required("Le numéro de téléphone est obligatoire."),
+  role: Yup.string()
+    .matches(roleRegex, "Rôle invalide.")
+    .required("Le rôle est obligatoire."),
+  structure: Yup.string()
+    .matches(nomStructureRegex, "Nom de structure invalide.")
+    .required("La structure est obligatoire."),
+  email: Yup.string()
+    .matches(emailRegex, "Email invalide.")
+    .required("L'email est obligatoire."),
+  password: Yup.string()
+    .matches(
+      motDePasseSecuriseRegex,
+      "Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule, un chiffre et un symbole."
+    )
+    .required("Le mot de passe est obligatoire."),
+});
+
+export default function Formulaire() {
   const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
 
-  const [formData, setFormData] = useState({
-    fullName: "",
-    phone: "",
-    schoolName: "",
-    schoolEmail: "",
-    role: "",
-    password: "",
-  });
-
-  const regex = {
-    fullName: /^[a-zA-ZÀ-ÿ]+(?: [a-zA-ZÀ-ÿ]+)+$/,
-    phone: /^6[5679][0-9]{7}$/,
-    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-    password: /^.{6,}$/,
-  };
-
-  const validateStep1 = () => {
-    let newErrors: { [key: string]: string } = {};
-
-    if (!regex.fullName.test(formData.fullName))
-      newErrors.fullName = "Nom complet invalide (au moins 2 mots).";
-    if (!regex.phone.test(formData.phone))
-      newErrors.phone =
-        "Numéro invalide (format Cameroun: 65/66/67/69xxxxxxx).";
-    if (!formData.schoolName.trim())
-      newErrors.schoolName = "Le nom de l'établissement est obligatoire.";
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const validateStep2 = () => {
-    let newErrors: { [key: string]: string } = {};
-
-    if (!regex.email.test(formData.schoolEmail))
-      newErrors.schoolEmail = "Email invalide.";
-    if (!formData.role.trim()) newErrors.role = "Veuillez choisir un rôle.";
-    if (!regex.password.test(formData.password))
-      newErrors.password = "Mot de passe : min. 6 caractères.";
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
-
-  const handleNext = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (validateStep1()) {
-      setStep(2);
-      setErrors({});
+  const handleFirebaseSignup = async (
+    values: any,
+    {
+      setStatus,
+      setSubmitting,
+      setFieldError,
+      resetForm,
+    }: {
+      setStatus: (status?: any) => void;
+      setSubmitting: (isSubmitting: boolean) => void;
+      setFieldError: (field: string, message: string) => void;
+      resetForm: () => void;
     }
-  };
-
-  const handleBack = () => {
-    setStep(1);
-    setErrors({});
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateStep2()) return;
-
-    setLoading(true);
-    setMessage("");
-
+  ) => {
+    setSubmitting(true);
+    setStatus(undefined);
     try {
-      console.log("📤 Envoi des données:", formData);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        values.email,
+        values.password
+      );
+      const user = userCredential.user;
 
-      const res = await fetch("/api/inscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+      await updateProfile(user, { displayName: values.nomComplet });
+      await sendEmailVerification(user);
+
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        ...values,
+        createdAt: serverTimestamp(),
+        emailVerified: user.emailVerified ?? false,
       });
 
-      const data = await res.json();
-      console.log("📥 Réponse API:", data);
-
-      if (!res.ok) {
-        throw new Error(data.error || "Erreur d'inscription");
-      }
-
-      setMessage("✅ " + data.message);
-      setTimeout(() => router.push("/login"), 2000);
-    } catch (err: any) {
-      console.error("💥 Erreur:", err);
-      setMessage("❌ " + err.message);
+      resetForm();
+      setStatus({
+        success:
+          "Compte créé avec succès ! Vérifiez votre email pour valider le compte.",
+      });
+      router.push("./solutions");
+    } catch (err) {
+      const code = (err as { code?: string })?.code ?? "";
+      if (code.includes("email-already-in-use"))
+        setFieldError("email", "Cet email est déjà utilisé.");
+      else if (code.includes("invalid-email"))
+        setFieldError("email", "Adresse email invalide.");
+      else if (code.includes("weak-password"))
+        setFieldError("password", "Mot de passe trop faible.");
+      else
+        setStatus({
+          error:
+            "Erreur serveur. Vérifiez votre connexion internet ou réessayez ultérieurement.",
+        });
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white px-4">
-      <div className="w-full max-w-md bg-white rounded-2xl p-8">
-        {/* Logo & Title */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="flex items-center space-x-2 mb-4">
-            <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900 mb-4">
-              <Bird size={38} className="text-emerald-400" />
-            </div>
-            <h1 className="hidden">TinyLMS</h1>
-          </div>
-          <h2 className="text-2xl font-bold text-slate-800">
-            {step === 1 ? "Créer un compte" : "Finaliser l'inscription"}
-          </h2>
-          <p className="text-slate-500 text-center mt-3 text-sm">
-            {step === 1
-              ? "Rejoignez TinyLMS et simplifiez la gestion de vos formations."
-              : "Complétez vos informations de connexion."}
+    <>
+      <Header />
+      <div className="min-h-screen bg-white pt-28 sm:pt-32 pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-xl mx-auto text-center">
+          <h1 className="text-3xl sm:text-4xl font-semibold text-gray-900 mb-3 leading-tight">
+            Créez votre compte
+          </h1>
+          <p className="text-sm sm:text-base text-gray-600 max-w-md mx-auto mb-10">
+            Remplissez les informations ci-dessous pour accéder à nos solutions
+            TinyDock.
+          </p>
+
+          <Formik
+            initialValues={{
+              nomComplet: "",
+              telephone: "",
+              role: "",
+              structure: "",
+              email: "",
+              password: "",
+            }}
+            validationSchema={validationSchema}
+            onSubmit={handleFirebaseSignup}
+          >
+            {({ isSubmitting, status }) => (
+              <Form className="bg-white rounded-xl px-6 py-0 sm:px-10 space-y-5 text-left">
+                {/* Messages globaux */}
+                {status?.success && (
+                  <p className="text-green-600 font-medium text-sm text-center">
+                    {status.success}
+                  </p>
+                )}
+                {status?.error && (
+                  <p className="text-red-600 font-medium text-sm text-center">
+                    {status.error}
+                  </p>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nom complet
+                    </label>
+                    <Field
+                      name="nomComplet"
+                      placeholder="Monsieur Untel"
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-400"
+                    />
+                    <ErrorMessage
+                      name="nomComplet"
+                      component="p"
+                      className="text-red-600 text-xs mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Téléphone
+                    </label>
+                    <Field
+                      name="telephone"
+                      placeholder="+2376XXXXXXXX"
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-400"
+                    />
+                    <ErrorMessage
+                      name="telephone"
+                      component="p"
+                      className="text-red-600 text-xs mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Rôle
+                  </label>
+                  <Field
+                    name="role"
+                    placeholder="Directeur, Manager..."
+                    className="w-full border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-400"
+                  />
+                  <ErrorMessage
+                    name="role"
+                    component="p"
+                    className="text-red-600 text-xs mt-1"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Structure
+                  </label>
+                  <Field
+                    name="structure"
+                    placeholder="MonEntreprise"
+                    className="w-full border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-400"
+                  />
+                  <ErrorMessage
+                    name="structure"
+                    component="p"
+                    className="text-red-600 text-xs mt-1"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email professionnel
+                  </label>
+                  <Field
+                    name="email"
+                    type="email"
+                    placeholder="exemple@entreprise.com"
+                    className="w-full border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-400"
+                  />
+                  <ErrorMessage
+                    name="email"
+                    component="p"
+                    className="text-red-600 text-xs mt-1"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Mot de passe
+                  </label>
+                  <Field
+                    name="password"
+                    type="password"
+                    placeholder="********"
+                    className="w-full border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-400"
+                  />
+                  <ErrorMessage
+                    name="password"
+                    component="p"
+                    className="text-red-600 text-xs mt-1"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-[#29abe2] hover:bg-[#219bd0] text-white py-3 rounded-lg font-medium transition"
+                >
+                  {isSubmitting
+                    ? "Inscription en cours..."
+                    : "Créer mon compte"}
+                </button>
+              </Form>
+            )}
+          </Formik>
+
+          <p className="text-sm text-gray-500 text-center mt-3">
+            En vous inscrivant, vous acceptez{" "}
+            <span className="text-blue-500 underline">
+              les conditions d’utilisation
+            </span>{" "}
+            de TinyDock.
           </p>
         </div>
-
-        {/* Step 1 Form */}
-        {step === 1 && (
-          <div className="space-y-5">
-            <div>
-              <label
-                htmlFor="fullName"
-                className="block text-sm font-medium text-slate-700 mb-2"
-              >
-                Nom complet
-              </label>
-              <div className="relative">
-                <User
-                  size={18}
-                  className="absolute left-3 top-3 text-slate-400"
-                />
-                <input
-                  id="fullName"
-                  name="fullName"
-                  type="text"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  placeholder="BANAKEN Ariel"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                />
-              </div>
-              {errors.fullName && (
-                <p className="text-red-500 text-sm mt-1">{errors.fullName}</p>
-              )}
-            </div>
-
-            <div>
-              <label
-                htmlFor="phone"
-                className="block text-sm font-medium text-slate-700 mb-2"
-              >
-                Numéro de téléphone
-              </label>
-              <div className="relative">
-                <Phone
-                  size={18}
-                  className="absolute left-3 top-3 text-slate-400"
-                />
-                <input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  placeholder="6XXXXXXXX"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                />
-              </div>
-              {errors.phone && (
-                <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
-              )}
-            </div>
-
-            <div>
-              <label
-                htmlFor="schoolName"
-                className="block text-sm font-medium text-slate-700 mb-2"
-              >
-                Nom de l'établissement
-              </label>
-              <div className="relative">
-                <Building2
-                  size={18}
-                  className="absolute left-3 top-3 text-slate-400"
-                />
-                <input
-                  id="schoolName"
-                  name="schoolName"
-                  type="text"
-                  value={formData.schoolName}
-                  onChange={handleChange}
-                  placeholder="Centre de formation XYZ"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                />
-              </div>
-              {errors.schoolName && (
-                <p className="text-red-500 text-sm mt-1">{errors.schoolName}</p>
-              )}
-            </div>
-
-            <button
-              onClick={handleNext}
-              className="w-full py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors"
-            >
-              Continuer
-            </button>
-          </div>
-        )}
-
-        {/* Step 2 Form */}
-        {step === 2 && (
-          <div className="space-y-5">
-            <div>
-              <label
-                htmlFor="schoolEmail"
-                className="block text-sm font-medium text-slate-700 mb-2"
-              >
-                Email de l'établissement
-              </label>
-              <div className="relative">
-                <Mail
-                  size={18}
-                  className="absolute left-3 top-3 text-slate-400"
-                />
-                <input
-                  id="schoolEmail"
-                  name="schoolEmail"
-                  type="email"
-                  value={formData.schoolEmail}
-                  onChange={handleChange}
-                  placeholder="contact@etablissement.com"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                />
-              </div>
-              {errors.schoolEmail && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.schoolEmail}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label
-                htmlFor="role"
-                className="block text-sm font-medium text-slate-700 mb-2"
-              >
-                Rôle
-              </label>
-              <div className="relative">
-                <Shield
-                  size={18}
-                  className="absolute left-3 top-3 text-slate-400"
-                />
-                <select
-                  id="role"
-                  name="role"
-                  value={formData.role}
-                  onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
-                >
-                  <option value="">Sélectionnez un rôle</option>
-                  <option value="administrateur">Directeur du centre</option>
-                  <option value="responsable">Responsable pédagogique</option>
-                  <option value="enseignant">Enseignant</option>
-                </select>
-              </div>
-              {errors.role && (
-                <p className="text-red-500 text-sm mt-1">{errors.role}</p>
-              )}
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-slate-700 mb-2"
-              >
-                Mot de passe
-              </label>
-              <div className="relative">
-                <Lock
-                  size={18}
-                  className="absolute left-3 top-3 text-slate-400"
-                />
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                />
-              </div>
-              {errors.password && (
-                <p className="text-red-500 text-sm mt-1">{errors.password}</p>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <button
-                onClick={handleSubmit}
-                className="w-full py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors"
-              >
-                S'inscrire
-              </button>
-              <button
-                onClick={handleBack}
-                className="w-full py-3 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors"
-              >
-                Retour
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="mt-6 text-center text-sm text-slate-500">
-          En vous inscrivant à TinyLMS, vous acceptez nos{" "}
-          <a href="#" className="text-emerald-600 hover:underline font-medium">
-            conditions d'utilisation
-          </a>
-          .
-        </div>
-        <p className="text-center mt-5 text-sm text-slate-500">
-          Vous avez déjà un compte ?{" "}
-          <button
-            className="underline text-emerald-600"
-            onClick={() => {
-              router.push("./login");
-            }}
-          >
-            Connectez vous ici
-          </button>
-        </p>
       </div>
-    </div>
+    </>
   );
 }

@@ -1,5 +1,5 @@
 {
-  "name": "tinylms-app",
+  "name": "tinydock-app",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,11 +9,18 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@heroui/spinner": "^2.2.24",
+    "@hookform/resolvers": "^5.2.2",
+    "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.58.0",
+    "firebase": "^12.4.0",
+    "formik": "^2.4.6",
     "lucide-react": "^0.544.0",
     "next": "15.5.4",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "react-hook-form": "^7.65.0",
+    "yup": "^1.7.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
